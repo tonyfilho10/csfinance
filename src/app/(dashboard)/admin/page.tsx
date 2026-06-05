@@ -517,6 +517,108 @@ function TabMembros() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Aba 4: Usuários
+// ─────────────────────────────────────────────────────────────────────────────
+function TabUsuarios() {
+  const supabase = createClient()
+  const [users, setUsers] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, avatar_url, created_at')
+        .order('full_name')
+
+      if (!profiles) { setLoading(false); return }
+
+      // Buscar entidades de cada usuário
+      const { data: entities } = await supabase
+        .from('entities')
+        .select('id, name, type, owner_id')
+
+      const entityMap: Record<string, any[]> = {}
+      for (const e of entities ?? []) {
+        if (!entityMap[e.owner_id]) entityMap[e.owner_id] = []
+        entityMap[e.owner_id].push(e)
+      }
+
+      setUsers(profiles.map(p => ({ ...p, entities: entityMap[p.id] ?? [] })))
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  const filtered = users.filter(u =>
+    u.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+    u.email?.toLowerCase().includes(search.toLowerCase())
+  )
+
+  return (
+    <div className="space-y-4">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <input
+          placeholder="Buscar por nome ou e-mail..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full pl-9 pr-4 h-9 rounded-lg border border-input bg-transparent text-sm outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
+        />
+      </div>
+
+      <p className="text-xs text-muted-foreground">{filtered.length} usuário{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}</p>
+
+      {loading ? (
+        <div className="space-y-2">
+          {[...Array(5)].map((_, i) => <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />)}
+        </div>
+      ) : filtered.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-8">Nenhum usuário encontrado</p>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(u => {
+            const initials = u.full_name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase() ?? '??'
+            return (
+              <div key={u.id} className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+                <Avatar className="w-10 h-10 flex-shrink-0">
+                  <AvatarImage src={u.avatar_url} />
+                  <AvatarFallback className="text-xs bg-primary text-primary-foreground">{initials}</AvatarFallback>
+                </Avatar>
+
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold truncate">{u.full_name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                </div>
+
+                <div className="flex flex-col gap-1 items-end flex-shrink-0">
+                  {u.entities.length === 0 ? (
+                    <Badge variant="outline" className="text-xs text-muted-foreground">Sem entidade</Badge>
+                  ) : (
+                    u.entities.map((e: any) => (
+                      <Badge
+                        key={e.id}
+                        variant={e.type === 'PJ' ? 'default' : 'secondary'}
+                        className="text-xs gap-1"
+                      >
+                        {e.type === 'PJ' ? <Building2 className="w-3 h-3" /> : <User className="w-3 h-3" />}
+                        {e.name.split(' ').slice(0, 2).join(' ')}
+                      </Badge>
+                    ))
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Página principal
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AdminPage() {
@@ -527,23 +629,41 @@ export default function AdminPage() {
         <p className="text-sm text-muted-foreground">Gestão de usuários e empresas do sistema</p>
       </div>
 
-      <Tabs defaultValue="pf">
-        <TabsList className="grid grid-cols-3 w-full">
-          <TabsTrigger value="pf" className="gap-2">
+      <Tabs defaultValue="usuarios">
+        <TabsList className="grid grid-cols-4 w-full">
+          <TabsTrigger value="usuarios" className="gap-1.5">
+            <Users className="w-4 h-4" />
+            <span className="hidden sm:inline">Usuários</span>
+          </TabsTrigger>
+          <TabsTrigger value="pf" className="gap-1.5">
             <User className="w-4 h-4" />
             <span className="hidden sm:inline">Criar</span> PF
           </TabsTrigger>
-          <TabsTrigger value="pj" className="gap-2">
+          <TabsTrigger value="pj" className="gap-1.5">
             <Building2 className="w-4 h-4" />
             <span className="hidden sm:inline">Criar</span> PJ
           </TabsTrigger>
-          <TabsTrigger value="membros" className="gap-2">
-            <Users className="w-4 h-4" />
-            Membros
+          <TabsTrigger value="membros" className="gap-1.5">
+            <UserPlus className="w-4 h-4" />
+            <span className="hidden sm:inline">Membros</span>
           </TabsTrigger>
         </TabsList>
 
         <div className="mt-6">
+          <TabsContent value="usuarios">
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base">Usuários cadastrados</CardTitle>
+                <CardDescription>
+                  Todos os usuários do sistema com suas entidades vinculadas (PF e PJ).
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TabUsuarios />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="pf">
             <Card>
               <CardHeader className="pb-4">
