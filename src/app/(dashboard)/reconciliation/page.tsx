@@ -6,14 +6,9 @@ import { useEntityStore } from '@/store/entity-store'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { CategoryCombobox } from '@/components/ui/category-combobox'
 import { toast } from 'sonner'
-import { Loader2, Sparkles, Check, ChevronDown } from 'lucide-react'
+import { Loader2, Sparkles, Check } from 'lucide-react'
 import type { Transaction, Category, ReconciliationSuggestion } from '@/types'
 import { formatCurrency, formatDate } from '@/lib/format'
 
@@ -224,39 +219,13 @@ export default function ReconciliationPage() {
                         {t.type === 'debit' ? '-' : '+'}{formatCurrency(Number(t.amount))}
                       </span>
 
-                      <DropdownMenu>
-                        <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-lg border border-input bg-transparent px-2.5 h-8 text-xs hover:bg-accent transition-colors min-w-32 max-w-48">
-                          {selectedCat ? (
-                            <>
-                              <span
-                                className="w-2 h-2 rounded-full flex-shrink-0"
-                                style={{ backgroundColor: selectedCat.color }}
-                              />
-                              <span className="truncate flex-1 text-left">{selectedCat.name}</span>
-                            </>
-                          ) : (
-                            <span className="text-muted-foreground flex-1 text-left">Sem categoria</span>
-                          )}
-                          <ChevronDown className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="max-h-56 overflow-y-auto w-48">
-                          <DropdownMenuItem
-                            onClick={() => setOverrides((o) => ({ ...o, [t.id]: { ...getEffective(t), category_id: '' } }))}
-                          >
-                            <span className="text-muted-foreground">Sem categoria</span>
-                          </DropdownMenuItem>
-                          {categories.map((c) => (
-                            <DropdownMenuItem
-                              key={c.id}
-                              onClick={() => setOverrides((o) => ({ ...o, [t.id]: { ...getEffective(t), category_id: c.id } }))}
-                              className="gap-2"
-                            >
-                              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: c.color }} />
-                              {c.name}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <CategoryCombobox
+                        categories={categories}
+                        value={effective.category_id}
+                        onChange={(id) => setOverrides((o) => ({ ...o, [t.id]: { ...getEffective(t), category_id: id } }))}
+                        size="sm"
+                        className="min-w-36 max-w-52"
+                      />
                     </div>
                   </div>
                 </CardContent>

@@ -6,15 +6,10 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { CategoryCombobox } from '@/components/ui/category-combobox'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { Loader2, Trash2, ChevronDown } from 'lucide-react'
+import { Loader2, Trash2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { Transaction, Category } from '@/types'
 
@@ -97,7 +92,6 @@ export function EditTransactionSheet({ transaction, open, onClose, onSaved }: Ed
     setDeleting(false)
   }
 
-  const selectedCat = categories.find((c) => c.id === form.category_id)
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
@@ -145,40 +139,12 @@ export function EditTransactionSheet({ transaction, open, onClose, onSaved }: Ed
 
           <div className="space-y-1.5">
             <Label>Categoria</Label>
-            <DropdownMenu>
-              <DropdownMenuTrigger className="w-full flex items-center justify-between gap-2 rounded-lg border border-input bg-transparent px-3 h-9 text-sm hover:bg-accent transition-colors">
-                {selectedCat ? (
-                  <span className="flex items-center gap-2">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: selectedCat.color }}
-                    />
-                    {selectedCat.name}
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">Sem categoria</span>
-                )}
-                <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-64 max-h-64 overflow-y-auto">
-                <DropdownMenuItem onClick={() => setForm({ ...form, category_id: '' })}>
-                  <span className="text-muted-foreground">Sem categoria</span>
-                </DropdownMenuItem>
-                {categories.map((c) => (
-                  <DropdownMenuItem
-                    key={c.id}
-                    onClick={() => setForm({ ...form, category_id: c.id })}
-                    className="gap-2"
-                  >
-                    <span
-                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: c.color }}
-                    />
-                    {c.name}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <CategoryCombobox
+              categories={categories}
+              value={form.category_id}
+              onChange={(id) => setForm({ ...form, category_id: id })}
+              className="w-full"
+            />
           </div>
 
           <div className="space-y-1.5">
