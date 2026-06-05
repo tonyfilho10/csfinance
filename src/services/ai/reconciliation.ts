@@ -7,8 +7,8 @@ const client = new Anthropic()
 // Sonnet só se o plano suportar funções com >26s
 const MODEL = 'claude-haiku-4-5'
 
-// Máx por batch: 10 no free plan (10s), pode subir para 20 no Pro (26s)
-const BATCH_SIZE = 10
+// 3 transações → ~2s com Haiku → margem confortável no limite de 10s Netlify free
+const BATCH_SIZE = 3
 
 async function suggestBatch(
   transactions: Transaction[],
