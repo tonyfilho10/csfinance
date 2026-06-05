@@ -3,47 +3,58 @@ import type { Transaction, Category, ReconciliationSuggestion } from '@/types'
 
 const client = new Anthropic()
 
-const BATCH_SIZE = 25
+// Haiku = muito mais rápido → cabe no timeout de 10s da Netlify (plano free)
+// Sonnet só se o plano suportar funções com >26s
+const MODEL = 'claude-haiku-4-5'
+
+// Máx por batch: 10 no free plan (10s), pode subir para 20 no Pro (26s)
+const BATCH_SIZE = 10
 
 async function suggestBatch(
   transactions: Transaction[],
   categories: Category[]
 ): Promise<ReconciliationSuggestion[]> {
-  const categoryList = categories
-    .map((c) => `${c.id}|${c.name}|${c.type}`)
-    .join('\n')
+  // Apenas categorias compatíveis com o tipo das transações do batch
+  const hasCredit = transactions.some((t) => t.type === 'credit')
+  const hasDebit  = transactions.some((t) => t.type === 'debit')
+  const filteredCats = categories.filter((c) =>
+    c.type === 'both' ||
+    (hasCredit && c.type === 'credit') ||
+    (hasDebit  && c.type === 'debit')
+  )
+
+  const categoryList = filteredCats.map((c) => `${c.id}|${c.name}`).join('\n')
 
   const transactionList = transactions
     .map((t) => `${t.id}|${t.date}|${t.description}|${t.amount}|${t.type}`)
     .join('\n')
 
   const message = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 4096,
+    model: MODEL,
+    max_tokens: 2048,
     messages: [
       {
         role: 'user',
-        content: `Você é um especialista em contabilidade brasileira categorizando transações bancárias.
+        content: `Categorize transações bancárias brasileiras. Responda SOMENTE com JSON.
 
-CATEGORIAS DISPONÍVEIS (id|nome|tipo):
+CATEGORIAS (id|nome):
 ${categoryList}
+
+REGRAS RÁPIDAS:
+- BB RF CP / CDB / LCI / Tesouro / Poupança → Investimento
+- iFood / Mercado / Supermercado / Padaria → Alimentação
+- Pix enviado / TED / Pagto → Transferência (se pessoa) ou pelo contexto
+- Salário / Holerite → Salário
+- GNRE / Impostos / SEFAZ / Tarifa / Taxa → Outros
+- Farmácia / Médico / Plano → Saúde
+- Posto / Uber / 99 → Transporte
+- Aluguel / Condomínio / Energia / Água / Internet → Moradia
 
 TRANSAÇÕES (id|data|descrição|valor|tipo):
 ${transactionList}
 
-REGRAS:
-- "Pix - Recebido", "Dep CORBAN", "Dep dinheiro", "Transferência recebida" → Salário ou Transferência
-- "Pix - Enviado", "Pagto", "TED" → categoria pelo destinatário
-- "BB RF CP", "CDB", "Tesouro", "LCI", "LCA", "Poupança" → Investimento
-- "Tarifa", "Taxa", "IOF", "GNRE", "Impostos", "SEFAZ", "GNRE ON LINE" → Outros
-- "Salário", "Holerite" → Salário
-- "Farmácia", "Médico", "Hospital", "Saúde", "Unimed" → Saúde
-- "Mercado", "Supermercado", "iFood", "Rappi" → Alimentação
-- "Cartão crédito" → Transferência
-- Priorize tipos compatíveis (debit→tipo debit ou both, credit→tipo credit ou both)
-
-Responda SOMENTE com JSON válido, sem texto adicional:
-[{"transaction_id":"uuid","suggested_category_id":"uuid","suggested_description":"descrição melhorada em pt-BR","confidence":85,"reasoning":"justificativa curta"}]`,
+JSON esperado (array):
+[{"transaction_id":"uuid","suggested_category_id":"uuid","suggested_description":"descrição em pt-BR","confidence":90,"reasoning":"motivo curto"}]`,
       },
     ],
   })

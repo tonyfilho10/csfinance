@@ -53,7 +53,7 @@ export default function ReconciliationPage() {
     setProgress({ done: 0, total: pending.length })
     setSuggestions({})
 
-    const BATCH = 25
+    const BATCH = 10 // Sincronizado com o service — Haiku + 10 tx cabe no timeout de 10s Netlify
     const allSuggestions: ReconciliationSuggestion[] = []
 
     try {

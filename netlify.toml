@@ -11,3 +11,6 @@
 
 [functions]
   node_bundler = "nft"
+  # Plano free: 10s | Plano Pro: até 26s
+  # Com Haiku + 10 tx por batch ficamos bem abaixo dos 10s
+  timeout = 26
