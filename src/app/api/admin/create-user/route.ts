@@ -4,9 +4,12 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
 
 function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-  if (!serviceKey) throw new Error('SUPABASE_SERVICE_ROLE_KEY não configurada')
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!url) throw new Error('NEXT_PUBLIC_SUPABASE_URL não configurada')
+  if (!serviceKey) throw new Error('SUPABASE_SERVICE_ROLE_KEY não configurada. Adicione a chave "service_role" do Supabase no .env.local e no Netlify.')
+
   return createAdminClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
@@ -26,7 +29,12 @@ export async function POST(req: NextRequest) {
     user_metadata: { full_name },
   })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (error) {
+    const msg = error.message.includes('Invalid API key')
+      ? 'Chave de serviço inválida. Verifique a SUPABASE_SERVICE_ROLE_KEY no Supabase Dashboard → Project Settings → API → service_role.'
+      : error.message
+    return NextResponse.json({ error: msg }, { status: 400 })
+  }
 
   // Create PF entity for the new user
   await prisma.entity.create({
