@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { parseOFX, readOFXFile } from '@/services/ofx'
+import { parseOFX, readOFXFile, parseOFXPeriod, type OFXPeriod } from '@/services/ofx'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -13,8 +14,9 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import { Loader2, Upload, FileText, CheckCircle2 } from 'lucide-react'
+import { Loader2, Upload, FileText, CheckCircle2, CalendarRange } from 'lucide-react'
 import type { BankAccount } from '@/types'
+import { formatDate } from '@/lib/format'
 
 interface ImportOFXDialogProps {
   open: boolean
@@ -25,9 +27,15 @@ interface ImportOFXDialogProps {
 
 export function ImportOFXDialog({ open, onOpenChange, account, onSuccess }: ImportOFXDialogProps) {
   const supabase = createClient()
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [file, setFile] = useState<File | null>(null)
-  const [preview, setPreview] = useState<{ total: number; credits: number; debits: number } | null>(null)
+  const [preview, setPreview] = useState<{
+    total: number
+    credits: number
+    debits: number
+    period: OFXPeriod | null
+  } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   async function handleFileSelect(selected: File | null) {
@@ -38,13 +46,18 @@ export function ImportOFXDialog({ open, onOpenChange, account, onSuccess }: Impo
     try {
       const text = await readOFXFile(selected)
       const transactions = parseOFX(text)
+      const period = parseOFXPeriod(text)
+
       if (transactions.length > 0) {
-        const credits = transactions.filter((t) => t.type === 'credit').length
-        const debits = transactions.filter((t) => t.type === 'debit').length
-        setPreview({ total: transactions.length, credits, debits })
+        setPreview({
+          total: transactions.length,
+          credits: transactions.filter((t) => t.type === 'credit').length,
+          debits: transactions.filter((t) => t.type === 'debit').length,
+          period,
+        })
       }
     } catch {
-      // preview only — ignore errors here
+      // preview only — erros ignorados aqui
     }
   }
 
@@ -55,6 +68,7 @@ export function ImportOFXDialog({ open, onOpenChange, account, onSuccess }: Impo
     try {
       const text = await readOFXFile(file)
       const transactions = parseOFX(text)
+      const period = parseOFXPeriod(text)
 
       if (transactions.length === 0) {
         toast.error('Nenhuma transação encontrada no arquivo OFX')
@@ -62,7 +76,6 @@ export function ImportOFXDialog({ open, onOpenChange, account, onSuccess }: Impo
         return
       }
 
-      // Insert in batches to avoid payload limits
       const BATCH = 50
       let imported = 0
       let skipped = 0
@@ -86,7 +99,7 @@ export function ImportOFXDialog({ open, onOpenChange, account, onSuccess }: Impo
         skipped += batch.length - (data?.length ?? 0)
       }
 
-      // Recalculate balance via API
+      // Recalcular saldo
       await fetch('/api/banks/recalculate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -95,12 +108,20 @@ export function ImportOFXDialog({ open, onOpenChange, account, onSuccess }: Impo
 
       const msg = skipped > 0
         ? `${imported} importadas, ${skipped} já existiam`
-        : `${imported} transações importadas com sucesso!`
+        : `${imported} transações importadas!`
       toast.success(msg)
+
       onSuccess()
       onOpenChange(false)
       setFile(null)
       setPreview(null)
+
+      // Redirecionar ao dashboard com o período do extrato pré-selecionado
+      if (period?.start && period?.end) {
+        router.push(`/dashboard?de=${period.start}&ate=${period.end}`)
+      } else {
+        router.push('/dashboard')
+      }
     } catch (err) {
       toast.error('Erro ao importar: ' + (err as Error).message)
     }
@@ -121,6 +142,7 @@ export function ImportOFXDialog({ open, onOpenChange, account, onSuccess }: Impo
         </DialogHeader>
 
         <div className="space-y-3">
+          {/* Drop zone */}
           <div
             className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-accent transition-colors"
             onClick={() => inputRef.current?.click()}
@@ -139,16 +161,31 @@ export function ImportOFXDialog({ open, onOpenChange, account, onSuccess }: Impo
             )}
           </div>
 
+          {/* Preview */}
           {preview && (
-            <div className="rounded-lg bg-muted px-4 py-3 text-sm space-y-1">
-              <div className="flex items-center gap-2 font-medium">
-                <CheckCircle2 className="w-4 h-4 text-green-500" />
+            <div className="rounded-lg bg-muted px-4 py-3 space-y-2">
+              <div className="flex items-center gap-2 font-medium text-sm">
+                <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
                 {preview.total} transações encontradas
               </div>
-              <div className="flex gap-4 text-muted-foreground pl-6">
-                <span className="text-green-600">{preview.credits} entradas</span>
-                <span className="text-red-500">{preview.debits} saídas</span>
+              <div className="flex gap-4 text-xs text-muted-foreground pl-6">
+                <span className="text-green-600 font-medium">{preview.credits} entradas</span>
+                <span className="text-red-500 font-medium">{preview.debits} saídas</span>
               </div>
+              {preview.period?.start && preview.period?.end && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground pl-6 border-t pt-2">
+                  <CalendarRange className="w-3.5 h-3.5 flex-shrink-0 text-primary" />
+                  <span>
+                    Período:{' '}
+                    <span className="font-medium text-foreground">
+                      {formatDate(preview.period.start)} a {formatDate(preview.period.end)}
+                    </span>
+                  </span>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground pl-6 border-t pt-2">
+                💡 Após importar, o dashboard será aberto no período do extrato.
+              </p>
             </div>
           )}
 

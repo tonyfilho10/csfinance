@@ -89,3 +89,27 @@ export function parseOFX(content: string): Omit<Transaction, 'id' | 'bank_accoun
 
   return results
 }
+
+export interface OFXPeriod {
+  start: string  // "YYYY-MM-DD"
+  end: string    // "YYYY-MM-DD"
+}
+
+/** Extrai o período declarado no cabeçalho do OFX (DTSTART/DTEND) */
+export function parseOFXPeriod(content: string): OFXPeriod | null {
+  const rawStart = extractTagValue(content, 'DTSTART')
+  const rawEnd   = extractTagValue(content, 'DTEND')
+
+  // Fallback: menor e maior data dentre as transações
+  if (!rawStart && !rawEnd) {
+    const txs = parseOFX(content)
+    if (!txs.length) return null
+    const dates = txs.map((t) => t.date).sort()
+    return { start: dates[0], end: dates[dates.length - 1] }
+  }
+
+  return {
+    start: rawStart ? parseOFXDate(rawStart) : '',
+    end:   rawEnd   ? parseOFXDate(rawEnd)   : '',
+  }
+}

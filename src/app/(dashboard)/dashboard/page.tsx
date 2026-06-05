@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useEntityStore } from '@/store/entity-store'
 import { EntitySelector } from '@/components/layout/entity-selector'
@@ -19,13 +20,20 @@ import {
 import { Building2, ChevronDown } from 'lucide-react'
 import { startOfMonth, endOfMonth, format } from 'date-fns'
 
-export default function DashboardPage() {
+function DashboardContent() {
   const supabase = createClient()
   const { currentEntity } = useEntityStore()
+  const searchParams = useSearchParams()
 
-  const [dateRange, setDateRange] = useState({
-    start: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
-    end: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
+  // Inicializa com query params do redirect pós-importação OFX, ou mês atual
+  const [dateRange, setDateRange] = useState(() => {
+    const de  = searchParams.get('de')
+    const ate = searchParams.get('ate')
+    if (de && ate) return { start: de, end: ate }
+    return {
+      start: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+      end: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
+    }
   })
   const [bankAccountId, setBankAccountId] = useState<string>('all')
   const [accounts, setAccounts] = useState<BankAccount[]>([])
@@ -198,5 +206,13 @@ export default function DashboardPage() {
         transactions={categoryTransactions}
       />
     </div>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="space-y-4 animate-pulse"><div className="h-8 bg-muted rounded w-48" /><div className="h-32 bg-muted rounded" /></div>}>
+      <DashboardContent />
+    </Suspense>
   )
 }
