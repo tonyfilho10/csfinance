@@ -48,35 +48,47 @@ export default function ReconciliationPage() {
     setProgress({ done: 0, total: pending.length })
     setSuggestions({})
 
-    const BATCH = 3 // 3 tx × ~2s Haiku = margem segura no limite de 10s Netlify free
+    const BATCH = 1 // 1 tx por chamada → ~1-2s Haiku → nunca expira no Netlify
     const allSuggestions: ReconciliationSuggestion[] = []
 
     try {
       for (let i = 0; i < pending.length; i += BATCH) {
         const batch = pending.slice(i, i + BATCH)
-        const res = await fetch('/api/reconcile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transactions: batch, categories }),
-        })
 
-        // Garantir que sempre lemos como texto antes de tentar JSON
-        const text = await res.text()
+        // Timeout de 8s + até 2 retentativas
         let data: ReconciliationSuggestion[] = []
-
-        try {
-          const parsed = JSON.parse(text)
-          if (!res.ok) {
-            throw new Error(parsed?.error ?? `Erro ${res.status}: ${res.statusText}`)
+        let attempts = 0
+        while (attempts < 3) {
+          attempts++
+          const controller = new AbortController()
+          const timer = setTimeout(() => controller.abort(), 8000)
+          try {
+            const res = await fetch('/api/reconcile', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ transactions: batch, categories }),
+              signal: controller.signal,
+            })
+            clearTimeout(timer)
+            const text = await res.text()
+            try {
+              const parsed = JSON.parse(text)
+              if (!res.ok) throw new Error(parsed?.error ?? `Erro ${res.status}`)
+              data = Array.isArray(parsed) ? parsed : []
+            } catch {
+              if (!res.ok) throw new Error(`Erro ${res.status} — verifique ANTHROPIC_API_KEY`)
+            }
+            break // sucesso
+          } catch (fetchErr) {
+            clearTimeout(timer)
+            const isAbort = (fetchErr as Error).name === 'AbortError'
+            if (attempts >= 3) {
+              console.warn(`Batch ${i + 1} falhou após ${attempts} tentativas — pulando`)
+              break
+            }
+            // Aguardar brevemente antes de retry
+            await new Promise((r) => setTimeout(r, isAbort ? 1000 : 500))
           }
-          data = Array.isArray(parsed) ? parsed : []
-        } catch (parseErr) {
-          // A rota retornou HTML (crash) — exibe mensagem útil
-          if (!res.ok) {
-            throw new Error(`Erro ${res.status} na IA. Verifique se a ANTHROPIC_API_KEY está configurada.`)
-          }
-          // Se a resposta foi 2xx mas não é JSON válido, pula o batch
-          console.warn(`Batch ${i / BATCH + 1}: resposta não-JSON ignorada`)
         }
 
         allSuggestions.push(...data)
@@ -87,7 +99,12 @@ export default function ReconciliationPage() {
       allSuggestions.forEach((s) => { map[s.transaction_id] = s })
       setSuggestions(map)
       setAiRun(true)
-      toast.success(`IA categorizou ${allSuggestions.length} de ${pending.length} lançamentos`)
+      const missed = pending.length - allSuggestions.length
+      toast.success(
+        missed > 0
+          ? `IA categorizou ${allSuggestions.length} de ${pending.length} lançamentos (${missed} ignorados por timeout)`
+          : `IA categorizou ${allSuggestions.length} lançamentos!`
+      )
     } catch (err) {
       toast.error('Erro na IA: ' + (err as Error).message)
     }
