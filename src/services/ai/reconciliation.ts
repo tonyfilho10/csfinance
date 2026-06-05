@@ -3,7 +3,9 @@ import type { Transaction, Category, ReconciliationSuggestion } from '@/types'
 
 const client = new Anthropic()
 
-export async function suggestReconciliation(
+const BATCH_SIZE = 25
+
+async function suggestBatch(
   transactions: Transaction[],
   categories: Category[]
 ): Promise<ReconciliationSuggestion[]> {
@@ -21,30 +23,27 @@ export async function suggestReconciliation(
     messages: [
       {
         role: 'user',
-        content: `Você é um assistente financeiro especializado em categorização de transações bancárias brasileiras.
+        content: `Você é um especialista em contabilidade brasileira categorizando transações bancárias.
 
-Categorias disponíveis (id|nome|tipo):
+CATEGORIAS DISPONÍVEIS (id|nome|tipo):
 ${categoryList}
 
-Transações para categorizar (id|data|descrição|valor|tipo):
+TRANSAÇÕES (id|data|descrição|valor|tipo):
 ${transactionList}
 
-Para cada transação, sugira:
-1. A categoria mais adequada
-2. Uma descrição melhorada e padronizada (em português)
-3. Nível de confiança (0-100)
-4. Breve justificativa
+REGRAS:
+- "Pix - Recebido", "Dep CORBAN", "Dep dinheiro", "Transferência recebida" → Salário ou Transferência
+- "Pix - Enviado", "Pagto", "TED" → categoria pelo destinatário
+- "BB RF CP", "CDB", "Tesouro", "LCI", "LCA", "Poupança" → Investimento
+- "Tarifa", "Taxa", "IOF", "GNRE", "Impostos", "SEFAZ", "GNRE ON LINE" → Outros
+- "Salário", "Holerite" → Salário
+- "Farmácia", "Médico", "Hospital", "Saúde", "Unimed" → Saúde
+- "Mercado", "Supermercado", "iFood", "Rappi" → Alimentação
+- "Cartão crédito" → Transferência
+- Priorize tipos compatíveis (debit→tipo debit ou both, credit→tipo credit ou both)
 
-Responda SOMENTE com JSON válido no formato:
-[
-  {
-    "transaction_id": "uuid",
-    "suggested_category_id": "uuid",
-    "suggested_description": "descrição melhorada",
-    "confidence": 85,
-    "reasoning": "justificativa curta"
-  }
-]`,
+Responda SOMENTE com JSON válido, sem texto adicional:
+[{"transaction_id":"uuid","suggested_category_id":"uuid","suggested_description":"descrição melhorada em pt-BR","confidence":85,"reasoning":"justificativa curta"}]`,
       },
     ],
   })
@@ -55,5 +54,26 @@ Responda SOMENTE com JSON válido no formato:
   const jsonMatch = content.text.match(/\[[\s\S]*\]/)
   if (!jsonMatch) return []
 
-  return JSON.parse(jsonMatch[0]) as ReconciliationSuggestion[]
+  try {
+    return JSON.parse(jsonMatch[0]) as ReconciliationSuggestion[]
+  } catch {
+    return []
+  }
+}
+
+export async function suggestReconciliation(
+  transactions: Transaction[],
+  categories: Category[],
+  onProgress?: (done: number, total: number) => void
+): Promise<ReconciliationSuggestion[]> {
+  const results: ReconciliationSuggestion[] = []
+
+  for (let i = 0; i < transactions.length; i += BATCH_SIZE) {
+    const batch = transactions.slice(i, i + BATCH_SIZE)
+    const batchResults = await suggestBatch(batch, categories)
+    results.push(...batchResults)
+    onProgress?.(Math.min(i + BATCH_SIZE, transactions.length), transactions.length)
+  }
+
+  return results
 }

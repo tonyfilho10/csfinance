@@ -3,14 +3,14 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, Building2, ArrowLeftRight, GitMerge, Settings } from 'lucide-react'
+import { LayoutDashboard, Building2, ArrowLeftRight, GitMerge, PiggyBank } from 'lucide-react'
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/banks', label: 'Contas', icon: Building2 },
-  { href: '/transactions', label: 'Lançamentos', icon: ArrowLeftRight },
+  { href: '/dashboard',      label: 'Início',         icon: LayoutDashboard },
+  { href: '/investimentos',  label: 'Investimentos',  icon: PiggyBank },
+  { href: '/banks',          label: 'Contas',      icon: Building2 },
+  { href: '/transactions',   label: 'Lançamentos', icon: ArrowLeftRight },
   { href: '/reconciliation', label: 'Conciliação', icon: GitMerge },
-  { href: '/settings', label: 'Config.', icon: Settings },
 ]
 
 export function MobileNav() {

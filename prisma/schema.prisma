@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum EntityType {
+  PF
+  PJ
+
+  @@map("entity_type")
+}
+
+enum UserRole {
+  owner
+  admin
+  member
+
+  @@map("user_role")
+}
+
+enum TransactionType {
+  credit
+  debit
+  both
+
+  @@map("transaction_type")
+}
+
+enum TransactionStatus {
+  pending
+  reconciled
+  ignored
+
+  @@map("transaction_status")
+}
+
+model Profile {
+  id        String   @id @db.Uuid
+  fullName  String   @map("full_name")
+  email     String
+  avatarUrl String?  @map("avatar_url")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  ownedEntities Entity[]       @relation("EntityOwner")
+  entityMembers EntityMember[]
+
+  @@map("profiles")
+}
+
+model Entity {
+  id        String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name      String
+  type      EntityType
+  document  String
+  ownerId   String     @map("owner_id") @db.Uuid
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz
+
+  owner        Profile        @relation("EntityOwner", fields: [ownerId], references: [id])
+  members      EntityMember[]
+  bankAccounts BankAccount[]
+  transactions Transaction[]
+  categories   Category[]
+
+  @@map("entities")
+}
+
+model EntityMember {
+  id         String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  entityId   String    @map("entity_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  role       UserRole  @default(member)
+  invitedAt  DateTime  @default(now()) @map("invited_at") @db.Timestamptz
+  acceptedAt DateTime? @map("accepted_at") @db.Timestamptz
+
+  entity  Entity  @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([entityId, userId])
+  @@map("entity_members")
+}
+
+model Category {
+  id       String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  entityId String?         @map("entity_id") @db.Uuid
+  name     String
+  color    String          @default("#6366f1")
+  icon     String?
+  type     TransactionType @default(both)
+  isSystem Boolean         @default(false) @map("is_system")
+
+  entity       Entity?       @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@map("categories")
+}
+
+model BankAccount {
+  id             String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  entityId       String   @map("entity_id") @db.Uuid
+  name           String
+  bankName       String   @map("bank_name")
+  bankCode       String?  @map("bank_code")
+  accountNumber  String?  @map("account_number")
+  agency         String?
+  initialBalance Decimal  @default(0) @map("initial_balance") @db.Decimal(15, 2)
+  currentBalance Decimal  @default(0) @map("current_balance") @db.Decimal(15, 2)
+  color          String?  @default("#6366f1")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  entity       Entity        @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@map("bank_accounts")
+}
+
+model Transaction {
+  id            String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  bankAccountId String            @map("bank_account_id") @db.Uuid
+  entityId      String            @map("entity_id") @db.Uuid
+  date          DateTime          @db.Date
+  description   String
+  amount        Decimal           @db.Decimal(15, 2)
+  type          TransactionType
+  categoryId    String?           @map("category_id") @db.Uuid
+  status        TransactionStatus @default(pending)
+  ofxId         String?           @map("ofx_id")
+  notes         String?
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  entity      Entity      @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  category    Category?   @relation(fields: [categoryId], references: [id])
+
+  @@unique([bankAccountId, ofxId])
+  @@map("transactions")
+}

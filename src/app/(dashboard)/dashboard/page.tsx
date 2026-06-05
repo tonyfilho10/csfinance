@@ -11,12 +11,12 @@ import { PeriodFilter } from '@/components/dashboard/period-filter'
 import { TransactionDrawer } from '@/components/transactions/transaction-drawer'
 import type { BankAccount, DashboardSummary, CategoryExpense, ChartDataPoint, Transaction } from '@/types'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Building2, ChevronDown } from 'lucide-react'
 import { startOfMonth, endOfMonth, format } from 'date-fns'
 
 export default function DashboardPage() {
@@ -75,15 +75,17 @@ export default function DashboardPage() {
 
     setSummary({ total_income: income, total_expenses: expenses, balance, transactions_count: transactions.length })
 
-    // Chart: group by week or day
-    const byDate: Record<string, { income: number; expenses: number }> = {}
+    // Chart: group by month (PF) or day (PJ)
+    const isPJ = currentEntity?.type === 'PJ'
+    const grouped: Record<string, { income: number; expenses: number }> = {}
     transactions.forEach((t) => {
-      if (!byDate[t.date]) byDate[t.date] = { income: 0, expenses: 0 }
-      if (t.type === 'credit') byDate[t.date].income += t.amount
-      else byDate[t.date].expenses += t.amount
+      const key = isPJ ? t.date : t.date.slice(0, 7) // day or month
+      if (!grouped[key]) grouped[key] = { income: 0, expenses: 0 }
+      if (t.type === 'credit') grouped[key].income += t.amount
+      else grouped[key].expenses += t.amount
     })
     setChartData(
-      Object.entries(byDate)
+      Object.entries(grouped)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([date, v]) => ({ date, ...v }))
     )
@@ -158,21 +160,31 @@ export default function DashboardPage() {
       {/* Filters */}
       <div className="flex flex-wrap gap-2">
         <PeriodFilter value={dateRange} onChange={setDateRange} />
-        <Select value={bankAccountId} onValueChange={(v) => setBankAccountId(v ?? 'all')}>
-          <SelectTrigger className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as contas</SelectItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg border border-input bg-transparent px-3 h-9 text-sm font-medium hover:bg-accent transition-colors">
+            <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="max-w-36 truncate">
+              {bankAccountId === 'all'
+                ? 'Todas as contas'
+                : accounts.find((a) => a.id === bankAccountId)?.name ?? 'Conta'}
+            </span>
+            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onClick={() => setBankAccountId('all')}>
+              Todas as contas
+            </DropdownMenuItem>
             {accounts.map((a) => (
-              <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+              <DropdownMenuItem key={a.id} onClick={() => setBankAccountId(a.id)}>
+                {a.name}
+              </DropdownMenuItem>
             ))}
-          </SelectContent>
-        </Select>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <SummaryCards summary={summary} loading={loading} />
-      <IncomeExpenseChart data={chartData} loading={loading} />
+      <IncomeExpenseChart data={chartData} loading={loading} isPJ={currentEntity?.type === 'PJ'} />
       <CategoryBreakdown
         categories={categoryExpenses}
         loading={loading}

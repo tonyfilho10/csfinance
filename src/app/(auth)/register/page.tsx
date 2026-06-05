@@ -24,17 +24,30 @@ export default function RegisterPage() {
       return
     }
     setLoading(true)
-    const { error } = await supabase.auth.signUp({
+
+    const { data, error } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
       options: { data: { full_name: form.full_name } },
     })
+
     if (error) {
       toast.error(error.message)
-    } else {
-      toast.success('Conta criada! Verifique seu e-mail.')
-      router.push('/login')
+      setLoading(false)
+      return
     }
+
+    // Create profile via API (fallback se o trigger não existir)
+    if (data.user) {
+      await fetch('/api/auth/ensure-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: data.user.id, fullName: form.full_name, email: form.email }),
+      })
+    }
+
+    toast.success('Conta criada! Você já pode entrar.')
+    router.push('/login')
     setLoading(false)
   }
 

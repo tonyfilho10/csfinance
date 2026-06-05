@@ -1,9 +1,14 @@
 import type { Metadata } from 'next'
-import { Geist } from 'next/font/google'
+import { Changa } from 'next/font/google'
 import './globals.css'
 import { Toaster } from '@/components/ui/sonner'
+import { ThemeProvider } from '@/components/layout/theme-provider'
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
+const changa = Changa({
+  subsets: ['latin'],
+  variable: '--font-changa',
+  weight: ['300', '400', '500', '600', '700', '800'],
+})
 
 export const metadata: Metadata = {
   title: 'CSFinance — Gestão Financeira',
@@ -12,9 +17,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className={`${geist.variable} h-full antialiased`}>
+    <html lang="pt-BR" className={`${changa.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="min-h-full bg-background font-sans">
-        {children}
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
         <Toaster richColors position="top-right" />
       </body>
     </html>
