@@ -40,21 +40,25 @@ async function suggestBatch(
 CATEGORIAS (id|nome):
 ${categoryList}
 
-REGRAS RÁPIDAS:
-- BB RF CP / CDB / LCI / Tesouro / Poupança → Investimento
-- iFood / Mercado / Supermercado / Padaria → Alimentação
-- Pix enviado / TED / Pagto → Transferência (se pessoa) ou pelo contexto
+REGRAS DE NEGÓCIO (sempre aplicar):
+- Transferência recebida / Dep CORBAN / Dep dinheiro / Pix recebido de CNPJ → Clientes
+- Pix enviado + NOME DE PESSOA FÍSICA → Transferência para PF
+- Tarifa / Taxa de serviço / Pacote de serviços / Mensalidade bancária → Tarifas
+- GNRE / SEFAZ / Imposto / Impostos / Quota / Simples / DAS → Impostos
+- BB RF CP / CDB / LCI / LCA / Tesouro / Poupança → Investimento
+- Pagamento cartão crédito / Fatura → Transferência
+- iFood / Mercado / Supermercado / Restaurante / Padaria → Alimentação
 - Salário / Holerite → Salário
-- GNRE / Impostos / SEFAZ / Tarifa / Taxa → Outros
-- Farmácia / Médico / Plano → Saúde
-- Posto / Uber / 99 → Transporte
+- Farmácia / Médico / Hospital / Plano de saúde / Unimed → Saúde
+- Posto / Uber / 99 / Combustível → Transporte
 - Aluguel / Condomínio / Energia / Água / Internet → Moradia
+- Escola / Faculdade / Curso / MBA → Educação
 
 TRANSAÇÕES (id|data|descrição|valor|tipo):
 ${transactionList}
 
-JSON esperado (array):
-[{"transaction_id":"uuid","suggested_category_id":"uuid","suggested_description":"descrição em pt-BR","confidence":90,"reasoning":"motivo curto"}]`,
+JSON esperado (sem texto fora do JSON):
+[{"transaction_id":"uuid","suggested_category_id":"uuid","suggested_description":"descrição limpa pt-BR","confidence":90,"reasoning":"1 frase"}]`,
       },
     ],
   })

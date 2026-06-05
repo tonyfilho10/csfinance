@@ -97,23 +97,28 @@ export default function ReconciliationPage() {
 
   async function approveAll() {
     setLoadingApprove(true)
-    let ok = 0
-    for (const t of pending) {
+    const updates = pending.map((t) => {
       const override = overrides[t.id]
       const suggestion = suggestions[t.id]
-      const catId = override?.category_id ?? suggestion?.suggested_category_id ?? null
-      const desc = override?.description ?? suggestion?.suggested_description ?? t.description
+      return {
+        id: t.id,
+        entityId: t.entity_id,
+        description: t.description,          // original (para salvar regra)
+        type: t.type,
+        categoryId: override?.category_id ?? suggestion?.suggested_category_id ?? null,
+        newDescription: override?.description ?? suggestion?.suggested_description ?? t.description,
+      }
+    })
 
-      const { error } = await supabase.from('transactions').update({
-        category_id: catId || null,
-        description: desc,
-        status: 'reconciled',
-      }).eq('id', t.id)
+    const res = await fetch('/api/reconcile/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates }),
+    })
+    const result = await res.json()
+    const ok = result.approved ?? 0
 
-      if (!error) ok++
-    }
-
-    toast.success(`${ok} lançamentos conciliados!`)
+    toast.success(`${ok} lançamentos conciliados! Regras salvas para próximas importações.`)
     setSuggestions({})
     setOverrides({})
     setAiRun(false)
@@ -200,7 +205,13 @@ export default function ReconciliationPage() {
                         <Badge variant={t.type === 'credit' ? 'default' : 'destructive'} className="text-xs h-4">
                           {t.type === 'credit' ? 'Entrada' : 'Saída'}
                         </Badge>
-                        {suggestion && (
+                        {suggestion && suggestion.confidence === 100 && (
+                          <Badge variant="outline" className="text-xs h-4 gap-1 text-green-600 border-green-500/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                            Regra
+                          </Badge>
+                        )}
+                        {suggestion && suggestion.confidence < 100 && (
                           <Badge variant="outline" className="text-xs h-4 gap-1 text-primary border-primary/30">
                             <Sparkles className="w-2.5 h-2.5" />
                             {suggestion.confidence}%

@@ -61,8 +61,9 @@ model Entity {
   owner        Profile        @relation("EntityOwner", fields: [ownerId], references: [id])
   members      EntityMember[]
   bankAccounts BankAccount[]
-  transactions Transaction[]
-  categories   Category[]
+  transactions     Transaction[]
+  categories       Category[]
+  transactionRules TransactionRule[]
 
   @@map("entities")
 }
@@ -91,8 +92,9 @@ model Category {
   type     TransactionType @default(both)
   isSystem Boolean         @default(false) @map("is_system")
 
-  entity       Entity?       @relation(fields: [entityId], references: [id], onDelete: Cascade)
-  transactions Transaction[]
+  entity           Entity?           @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  transactions     Transaction[]
+  transactionRules TransactionRule[]
 
   @@map("categories")
 }
@@ -114,6 +116,23 @@ model BankAccount {
   transactions Transaction[]
 
   @@map("bank_accounts")
+}
+
+model TransactionRule {
+  id              String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  entityId        String   @map("entity_id") @db.Uuid
+  descriptionKey  String   @map("description_key")
+  transactionType String   @map("transaction_type")
+  categoryId      String?  @map("category_id") @db.Uuid
+  hits            Int      @default(1)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  entity   Entity    @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id])
+
+  @@unique([entityId, descriptionKey, transactionType])
+  @@map("transaction_rules")
 }
 
 model Transaction {
