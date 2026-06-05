@@ -22,10 +22,23 @@ export function EntitySelector() {
     async function fetchEntities() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+
       const { data } = await supabase.from('entities').select('*').order('name')
-      if (data) {
-        setEntities(data)
-        if (!currentEntity && data.length > 0) setCurrentEntity(data[0])
+      const allowed = data ?? []
+      setEntities(allowed)
+
+      // Se a entidade no store não está na lista retornada pelo RLS
+      // (outro usuário a possuía e o RLS bloqueou), limpa e usa a primeira disponível
+      if (allowed.length > 0) {
+        const stillValid = currentEntity
+          ? allowed.some((e) => e.id === currentEntity.id)
+          : false
+
+        if (!stillValid) {
+          setCurrentEntity(allowed[0])
+        }
+      } else {
+        setCurrentEntity(null)
       }
     }
     fetchEntities()
@@ -33,18 +46,23 @@ export function EntitySelector() {
 
   if (entities.length === 0) return null
 
-  const Icon = currentEntity?.type === 'PJ' ? Building2 : User
+  // Usar a entidade do store apenas se ela estiver na lista (segurança extra)
+  const safeEntity = currentEntity && entities.some(e => e.id === currentEntity.id)
+    ? currentEntity
+    : entities[0] ?? null
+
+  const Icon = safeEntity?.type === 'PJ' ? Building2 : User
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg border border-input bg-transparent px-3 h-8 text-sm font-medium hover:bg-accent transition-colors max-w-64">
         <Icon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
         <span className="truncate flex-1 text-left">
-          {currentEntity?.name ?? 'Selecionar entidade'}
+          {safeEntity?.name ?? 'Selecionar entidade'}
         </span>
-        {currentEntity && (
-          <Badge variant={currentEntity.type === 'PF' ? 'secondary' : 'default'} className="text-xs flex-shrink-0">
-            {currentEntity.type}
+        {safeEntity && (
+          <Badge variant={safeEntity.type === 'PF' ? 'secondary' : 'default'} className="text-xs flex-shrink-0">
+            {safeEntity.type}
           </Badge>
         )}
         <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
