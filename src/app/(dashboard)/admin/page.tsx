@@ -520,7 +520,6 @@ function TabMembros() {
 // Aba 4: Usuários
 // ─────────────────────────────────────────────────────────────────────────────
 function TabUsuarios() {
-  const supabase = createClient()
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -528,26 +527,16 @@ function TabUsuarios() {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, avatar_url, created_at')
-        .order('full_name')
-
-      if (!profiles) { setLoading(false); return }
-
-      // Buscar entidades de cada usuário
-      const { data: entities } = await supabase
-        .from('entities')
-        .select('id, name, type, owner_id')
-
-      const entityMap: Record<string, any[]> = {}
-      for (const e of entities ?? []) {
-        if (!entityMap[e.owner_id]) entityMap[e.owner_id] = []
-        entityMap[e.owner_id].push(e)
+      try {
+        // Usa rota API com Service Role Key para ver todos os usuários (bypassa RLS)
+        const res = await fetch('/api/admin/users')
+        if (res.ok) {
+          const data = await res.json()
+          setUsers(data)
+        }
+      } finally {
+        setLoading(false)
       }
-
-      setUsers(profiles.map(p => ({ ...p, entities: entityMap[p.id] ?? [] })))
-      setLoading(false)
     }
     load()
   }, [])

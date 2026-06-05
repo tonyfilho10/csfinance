@@ -30,9 +30,17 @@ export async function POST(req: NextRequest) {
   })
 
   if (error) {
-    const msg = error.message.includes('Invalid API key')
-      ? 'Chave de serviço inválida. Verifique a SUPABASE_SERVICE_ROLE_KEY no Supabase Dashboard → Project Settings → API → service_role.'
-      : error.message
+    const raw = error.message ?? ''
+    let msg = raw
+    if (raw.includes('Invalid API key') || raw.includes('invalid api key')) {
+      msg = 'Chave de serviço inválida. Verifique a SUPABASE_SERVICE_ROLE_KEY no Supabase Dashboard → Project Settings → API → service_role.'
+    } else if (raw.includes('already been registered') || raw.includes('already registered') || raw.includes('User already registered')) {
+      msg = 'Já existe um usuário cadastrado com este e-mail.'
+    } else if (raw.includes('Invalid email')) {
+      msg = 'E-mail inválido.'
+    } else if (raw.includes('Password should be')) {
+      msg = 'Senha muito curta. Use no mínimo 8 caracteres.'
+    }
     return NextResponse.json({ error: msg }, { status: 400 })
   }
 
