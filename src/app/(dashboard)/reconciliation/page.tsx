@@ -65,12 +65,25 @@ export default function ReconciliationPage() {
           body: JSON.stringify({ transactions: batch, categories }),
         })
 
-        if (!res.ok) {
-          const err = await res.json()
-          throw new Error(err.error ?? 'Erro desconhecido')
+        // Garantir que sempre lemos como texto antes de tentar JSON
+        const text = await res.text()
+        let data: ReconciliationSuggestion[] = []
+
+        try {
+          const parsed = JSON.parse(text)
+          if (!res.ok) {
+            throw new Error(parsed?.error ?? `Erro ${res.status}: ${res.statusText}`)
+          }
+          data = Array.isArray(parsed) ? parsed : []
+        } catch (parseErr) {
+          // A rota retornou HTML (crash) — exibe mensagem útil
+          if (!res.ok) {
+            throw new Error(`Erro ${res.status} na IA. Verifique se a ANTHROPIC_API_KEY está configurada.`)
+          }
+          // Se a resposta foi 2xx mas não é JSON válido, pula o batch
+          console.warn(`Batch ${i / BATCH + 1}: resposta não-JSON ignorada`)
         }
 
-        const data: ReconciliationSuggestion[] = await res.json()
         allSuggestions.push(...data)
         setProgress({ done: Math.min(i + BATCH, pending.length), total: pending.length })
       }
